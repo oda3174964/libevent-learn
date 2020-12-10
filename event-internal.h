@@ -85,7 +85,7 @@ extern "C" {
 /** Structure to define the backend of a given event_base. */
 struct eventop {
 	/** The name of this backend. */
-	const char *name;
+	const char *name; //多路IO复用函数的名字
 	/** Function to set up an event_base to use this backend.  It should
 	 * create a new structure holding whatever information is needed to
 	 * run the backend, and return it.  The returned pointer will get
@@ -113,16 +113,16 @@ struct eventop {
 	void (*dealloc)(struct event_base *);
 	/** Flag: set if we need to reinitialize the event base after we fork.
 	 */
-	int need_reinit;
+	int need_reinit; //是否要重新初始化
 	/** Bit-array of supported event_method_features that this backend can
 	 * provide. */
-	enum event_method_feature features;
+	enum event_method_feature features; //多路IO复用的特征。
 	/** Length of the extra information we should record for each fd that
 	    has one or more active events.  This information is recorded
 	    as part of the evmap entry for each fd, and passed as an argument
 	    to the add and del functions above.
 	 */
-	size_t fdinfo_len;
+	size_t fdinfo_len; //额外信息的长度。有些多路IO复用函数需要额外的信息
 };
 
 #ifdef _WIN32
@@ -162,12 +162,15 @@ struct event_signal_map {
  **/
 struct common_timeout_list {
 	/* List of events currently waiting in the queue. */
+	//超时event队列。将所有具有相同超时时长的超时event放到一个队列里面
 	struct event_list events;
 	/* 'magic' timeval used to indicate the duration of events in this
 	 * queue. */
+	//超时时长
 	struct timeval duration;
 	/* Event that triggers whenever one of the events in the queue is
 	 * ready to activate */
+	//具有相同超时时长的超时event代表
 	struct event timeout_event;
 	/* The event_base that this timeout list is part of */
 	struct event_base *base;
@@ -272,10 +275,14 @@ struct event_base {
 
 	/** An array of common_timeout_list* for all of the common timeout
 	 * values we know. */
+	//因为可以有多个不同时长的超时event组。故得是数组
+	//因为数组元素是common_timeout_list指针，所以得是二级指针
 	struct common_timeout_list **common_timeout_queues;
 	/** The number of entries used in common_timeout_queues */
+	//数组元素个数
 	int n_common_timeouts;
 	/** The total size of common_timeout_queues. */
+	//已分配的数组元素个数
 	int n_common_timeouts_allocated;
 
 	/** Mapping from file descriptors to enabled (added) events */
@@ -329,14 +336,17 @@ struct event_base {
 	/* Notify main thread to wake up break, etc. */
 	/** True if the base already has a pending notify, and we don't need
 	 * to add any more. */
+	//event_base是否处于通知的未决状态。即次线程已经通知了，但主线程还没处理这个通知
 	int is_notify_pending;
 	/** A socketpair used by some th_notify functions to wake up the main
 	 * thread. */
+	//通信管道
 	evutil_socket_t th_notify_fd[2];
 	/** An event used by some th_notify functions to wake up the main
 	 * thread. */
 	struct event th_notify;
 	/** A function used to wake up the main thread from another thread. */
+	//有两个可供选择的通知函数，指向其中一个通知函数
 	int (*th_notify_fn)(struct event_base *base);
 
 	/** Saved seed for weak random number generator. Some backends use

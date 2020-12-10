@@ -95,6 +95,7 @@ extern "C" {
 struct evthread_lock_callbacks {
 	/** The current version of the locking API.  Set this to
 	 * EVTHREAD_LOCK_API_VERSION */
+	// 版本号，设置为宏EVTHREAD_LOCK_API_VERSION
 	int lock_api_version;
 	/** Which kinds of locks does this version of the locking API
 	 * support?  A bitfield of EVTHREAD_LOCKTYPE_RECURSIVE and
@@ -103,9 +104,12 @@ struct evthread_lock_callbacks {
 	 * (Note that RECURSIVE locks are currently mandatory, and
 	 * READWRITE locks are not currently used.)
 	 **/
+	// 支持的锁类型，有普通锁，递归锁，读写锁三种
 	unsigned supported_locktypes;
 	/** Function to allocate and initialize new lock of type 'locktype'.
 	 * Returns NULL on failure. */
+	// 分配一个锁变量(指针类型)，因为不同的平台锁变量是不同的类型
+	// 所以用这个通用的void*类型
 	void *(*alloc)(unsigned locktype);
 	/** Funtion to release all storage held in 'lock', which was created
 	 * with type 'locktype'. */

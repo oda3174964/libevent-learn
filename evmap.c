@@ -88,6 +88,7 @@ struct event_map_entry {
 
 /* Helper used by the event_io_map hashtable code; tries to return a good hash
  * of the fd in e->fd. */
+// 哈希函数
 static inline unsigned
 hashsocket(struct event_map_entry *e)
 {
@@ -201,16 +202,24 @@ evmap_io_clear_(struct event_io_map* ctx)
 /** Expand 'map' with new entries of width 'msize' until it is big enough
 	to store a value in 'slot'.
  */
+//slot是信号值sig，或者文件描述符fd.
+//当sig或者fd >= map的nentries变量时就会调用此函数
 static int
 evmap_make_space(struct event_signal_map *map, int slot, int msize)
 {
 	if (map->nentries <= slot) {
+		//posix标准中，信号的种类就只有32种。
+        //http://blog.csdn.net/luotuo44/article/details/16799607
+        //在Windows中，信号的种类就更少了，只有6种。
+        //http://msdn.microsoft.com/zh-cn/library/xdkz3x12.aspx
+        //所以一开始取32还是比较合理的
 		int nentries = map->nentries ? map->nentries : 32;
 		void **tmp;
 
 		if (slot > INT_MAX / 2)
 			return (-1);
 
+		//当slot是一个文件描述符时，就会大于32
 		while (nentries <= slot)
 			nentries <<= 1;
 
@@ -221,6 +230,7 @@ evmap_make_space(struct event_signal_map *map, int slot, int msize)
 		if (tmp == NULL)
 			return (-1);
 
+		//清零是很有必要的。因为tmp是二级指针，数组里面的元素是一个指针
 		memset(&tmp[map->nentries], 0,
 		    (nentries - map->nentries) * msize);
 
@@ -427,10 +437,13 @@ evmap_io_active_(struct event_base *base, evutil_socket_t fd, short events)
 	if (fd < 0 || fd >= io->nentries)
 		return;
 #endif
+	//由这个fd找到对应event_map_entry的TAILQ_HEAD
 	GET_IO_SLOT(ctx, io, fd, evmap_io);
 
 	if (NULL == ctx)
 		return;
+	
+	//遍历这个队列。将所有与fd相关联的event结构体都处理一遍
 	LIST_FOREACH(ev, &ctx->events, ev_io_next) {
 		if (ev->ev_events & (events & ~EV_ET))
 			event_active_nolock_(ev, ev->ev_events & events, 1);
@@ -461,6 +474,11 @@ evmap_signal_add_(struct event_base *base, int sig, struct event *ev)
 			map, sig, sizeof(struct evmap_signal *)) == -1)
 			return (-1);
 	}
+
+	//无论是GET_SIGNAL_SLOT_AND_CTOR还是GET_IO_SLOT_AND_CTOR，其作用
+    //都是在数组(哈希表也是一个数组)中找到fd中的一个结构。
+    //GET_SIGNAL_SLOT_AND_CTOR(ctx, map, sig, evmap_signal, evmap_signal_init,
+    //base->evsigsel->fdinfo_len);
 	GET_SIGNAL_SLOT_AND_CTOR(ctx, map, sig, evmap_signal, evmap_signal_init,
 	    base->evsigsel->fdinfo_len);
 
@@ -470,6 +488,7 @@ evmap_signal_add_(struct event_base *base, int sig, struct event *ev)
 			return (-1);
 	}
 
+	//将所有有相同信号值的event连起来
 	LIST_INSERT_HEAD(&ctx->events, ev, ev_signal_next);
 
 	return (1);
@@ -506,6 +525,7 @@ evmap_signal_active_(struct event_base *base, evutil_socket_t sig, int ncalls)
 
 	if (sig < 0 || sig >= map->nentries)
 		return;
+	//通过这个fd找到对应的TAILQ_HEAD
 	GET_SIGNAL_SLOT(ctx, map, sig, evmap_signal);
 
 	if (!ctx)

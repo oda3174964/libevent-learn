@@ -316,7 +316,7 @@ evthread_use_windows_threads(void)
 		evthread_win32_cond_signal,
 		evthread_win32_cond_wait
 	};
-#ifdef WIN32_HAVE_CONDITION_VARIABLES
+#ifdef WIN32_HAVE_CONDITION_VARIABLES // 有内置的条件变量功能
 	struct evthread_condition_callbacks condvar_cbs = {
 		EVTHREAD_CONDITION_API_VERSION,
 		evthread_win32_condvar_alloc,
@@ -328,7 +328,7 @@ evthread_use_windows_threads(void)
 
 	evthread_set_lock_callbacks(&cbs);
 	evthread_set_id_callback(evthread_win32_get_id);
-#ifdef WIN32_HAVE_CONDITION_VARIABLES
+#ifdef WIN32_HAVE_CONDITION_VARIABLES // 优先使用Windows自身提供的条件变量
 	if (evthread_win32_condvar_init()) {
 		evthread_set_condition_callbacks(&condvar_cbs);
 		return 0;

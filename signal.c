@@ -135,6 +135,7 @@ evsig_cb(evutil_socket_t fd, short what, void *arg)
 	static char signals[1024];
 	ev_ssize_t n;
 	int i;
+	//NSIG是信号的个数
 	int ncaught[NSIG];
 	struct event_base *base;
 
@@ -144,6 +145,9 @@ evsig_cb(evutil_socket_t fd, short what, void *arg)
 
 	while (1) {
 #ifdef _WIN32
+		//读取socketpair中的数据。从中可以知道有哪些信号发生了
+		//已经socketpair的读端已经设置为非阻塞的。所以不会被阻塞在
+		//recv函数中。这个循环要把socketpair的所有数据都读取出来
 		n = recv(fd, signals, sizeof(signals), 0);
 #else
 		n = read(fd, signals, sizeof(signals));
@@ -157,16 +161,18 @@ evsig_cb(evutil_socket_t fd, short what, void *arg)
 			/* XXX warn? */
 			break;
 		}
+		//遍历数据数组，把每一个字节当作一个信号
 		for (i = 0; i < n; ++i) {
 			ev_uint8_t sig = signals[i];
 			if (sig < NSIG)
-				ncaught[sig]++;
+				ncaught[sig]++; //该信号发生的次数
 		}
 	}
 
 	EVBASE_ACQUIRE_LOCK(base, th_base_lock);
+	
 	for (i = 0; i < NSIG; ++i) {
-		if (ncaught[i])
+		if (ncaught[i]) //有信号发生就为之调用evmap_signal_active
 			evmap_signal_active_(base, i, ncaught[i]);
 	}
 	EVBASE_RELEASE_LOCK(base, th_base_lock);
@@ -197,11 +203,15 @@ evsig_init_(struct event_base *base)
 	base->sig.sh_old = NULL;
 	base->sig.sh_old_max = 0;
 
+	//将ev_signal_pair[1]与ev_signal这个event相关联。ev_signal_pair[1]为读端
+	//该函数的作用等同于event_new。实际上event_new内部也是调用event_assign函数完成工作的
 	event_assign(&base->sig.ev_signal, base, base->sig.ev_signal_pair[0],
 		EV_READ | EV_PERSIST, evsig_cb, base);
 
+	//标明是内部使用的
 	base->sig.ev_signal.ev_flags |= EVLIST_INTERNAL;
-	event_priority_set(&base->sig.ev_signal, 0);
+	//Libevent中，event是有优先级的
+	event_priority_set(&base->sig.ev_signal, 0); //最高优先级
 
 	base->evsigsel = &evsigops;
 
@@ -214,6 +224,7 @@ int
 evsig_set_handler_(struct event_base *base,
     int evsignal, void (__cdecl *handler)(int))
 {
+	//如果有sigaction就优先使用之
 #ifdef EVENT__HAVE_SIGACTION
 	struct sigaction sa;
 #else
@@ -226,6 +237,7 @@ evsig_set_handler_(struct event_base *base,
 	 * resize saved signal handler array up to the highest signal number.
 	 * a dynamic array is used to keep footprint on the low side.
 	 */
+	//数组的一个元素就存放一个信号。信号值等于其下标
 	if (evsignal >= sig->sh_old_max) {
 		int new_max = evsignal + 1;
 		event_debug(("%s: evsignal (%d) >= sh_old_max (%d), resizing",
@@ -264,12 +276,14 @@ evsig_set_handler_(struct event_base *base,
 		return (-1);
 	}
 #else
+	//设置信号处理函数
 	if ((sh = signal(evsignal, handler)) == SIG_ERR) {
 		event_warn("signal");
 		mm_free(sig->sh_old[evsignal]);
 		sig->sh_old[evsignal] = NULL;
 		return (-1);
 	}
+	//保存之前的信号捕抓函数。当用户event_del这个信号监听后，就可以恢复了
 	*sig->sh_old[evsignal] = sh;
 #endif
 

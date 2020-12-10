@@ -11,14 +11,21 @@
 #define HT_HEAD(name, type)                                             \
   struct name {                                                         \
     /* The hash table itself. */                                        \
+    // 哈希表
     struct type **hth_table;                                            \
     /* How long is the hash table? */                                   \
+    // 哈希表的长度
     unsigned hth_table_length;                                          \
     /* How many elements does the table contain? */                     \
+    // 哈希的元素个数
     unsigned hth_n_entries;                                             \
     /* How many elements will we allow in the table before resizing it? */ \
+    // resize 之前可以存多少个元素
+    // 在event_io_map_HT_GROW函数中可以看到其值为hth_table_length的
+    // 一半。但hth_n_entries>=hth_load_limit时，就会发生增长哈希表的长度
     unsigned hth_load_limit;                                            \
     /* Position of hth_table_length in the primes table. */             \
+    // 后面素数表中的下标值。主要是指明用到了哪个素数
     int hth_prime_idx;                                                  \
   }
 

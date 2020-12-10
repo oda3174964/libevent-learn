@@ -74,15 +74,15 @@ struct evconnlistener_ops {
 };
 
 struct evconnlistener {
-	const struct evconnlistener_ops *ops;
-	void *lock;
-	evconnlistener_cb cb;
-	evconnlistener_errorcb errorcb;
-	void *user_data;
-	unsigned flags;
-	short refcnt;
+	const struct evconnlistener_ops *ops; //操作函数
+	void *lock; //锁变量，用于线程安全
+	evconnlistener_cb cb; //用户的回调函数
+	evconnlistener_errorcb errorcb; //发生错误时的回调函数
+	void *user_data; //回调函数的参数
+	unsigned flags; //属性标志
+	short refcnt; //引用计数
 	int accept4_flags;
-	unsigned enabled : 1;
+	unsigned enabled : 1; //位域为1.即只需一个比特位来存储这个成员
 };
 
 struct evconnlistener_event {
@@ -131,7 +131,9 @@ listener_decref_and_unlock(struct evconnlistener *listener)
 {
 	int refcnt = --listener->refcnt;
 	if (refcnt == 0) {
+		//实际调用event_listener_destroy
 		listener->ops->destroy(listener);
+		//释放锁
 		UNLOCK(listener);
 		EVTHREAD_FREE_LOCK(listener->lock, EVTHREAD_LOCKTYPE_RECURSIVE);
 		mm_free(listener);
@@ -194,14 +196,15 @@ evconnlistener_new(struct event_base *base,
 	if (flags & LEV_OPT_CLOSE_ON_EXEC)
 		lev->base.accept4_flags |= EVUTIL_SOCK_CLOEXEC;
 
-	if (flags & LEV_OPT_THREADSAFE) {
+	if (flags & LEV_OPT_THREADSAFE) { //线程安全就需要分配锁
 		EVTHREAD_ALLOC_LOCK(lev->base.lock, EVTHREAD_LOCKTYPE_RECURSIVE);
 	}
 
+	//在多路IO复用函数中，新客户端的连接请求也被当作读事件
 	event_assign(&lev->listener, base, fd, EV_READ|EV_PERSIST,
 	    listener_read_cb, lev);
 
-	if (!(flags & LEV_OPT_DISABLED))
+	if (!(flags & LEV_OPT_DISABLED)) //会调用event_add，把event加入到event_base中
 	    evconnlistener_enable(&lev->base);
 
 	return &lev->base;
@@ -218,6 +221,7 @@ evconnlistener_new_bind(struct event_base *base, evconnlistener_cb cb,
 	int family = sa ? sa->sa_family : AF_UNSPEC;
 	int socktype = SOCK_STREAM | EVUTIL_SOCK_NONBLOCK;
 
+	//监听个数不能为0
 	if (backlog == 0)
 		return NULL;
 
@@ -283,8 +287,9 @@ event_listener_destroy(struct evconnlistener *lev)
 	struct evconnlistener_event *lev_e =
 	    EVUTIL_UPCAST(lev, struct evconnlistener_event, base);
 
+	//把event从event_base中删除
 	event_del(&lev_e->listener);
-	if (lev->flags & LEV_OPT_CLOSE_ON_FREE)
+	if (lev->flags & LEV_OPT_CLOSE_ON_FREE) //如果用户设置了这个选项，那么要关闭socket
 		evutil_closesocket(event_get_fd(&lev_e->listener));
 	event_debug_unassign(&lev_e->listener);
 }
@@ -296,7 +301,7 @@ evconnlistener_enable(struct evconnlistener *lev)
 	LOCK(lev);
 	lev->enabled = 1;
 	if (lev->cb)
-		r = lev->ops->enable(lev);
+		r = lev->ops->enable(lev); //实际上是调用下面的event_listener_enable函数
 	else
 		r = 0;
 	UNLOCK(lev);
@@ -319,6 +324,7 @@ event_listener_enable(struct evconnlistener *lev)
 {
 	struct evconnlistener_event *lev_e =
 	    EVUTIL_UPCAST(lev, struct evconnlistener_event, base);
+	//加入到event_base，完成监听工作
 	return event_add(&lev_e->listener, NULL);
 }
 
@@ -399,7 +405,7 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 	evconnlistener_errorcb errorcb;
 	void *user_data;
 	LOCK(lev);
-	while (1) {
+	while (1) { //可能有多个客户端同时请求连接
 		struct sockaddr_storage ss;
 		ev_socklen_t socklen = sizeof(ss);
 		evutil_socket_t new_fd = evutil_accept4_(fd, (struct sockaddr*)&ss, &socklen, lev->accept4_flags);
@@ -412,17 +418,23 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 			continue;
 		}
 
+		//用户还没设置连接监听器的回调函数
 		if (lev->cb == NULL) {
 			evutil_closesocket(new_fd);
 			UNLOCK(lev);
 			return;
 		}
+
+		//由于refcnt被初始化为1.这里有++了，所以一般情况下并不会进入下面的
+		//if判断里面。但如果程在下面UNLOCK之后，第二个线调用evconnlistener_free
+		//释放这个evconnlistener时，就有可能使得refcnt为1了。即进入那个判断体里
+		//执行listener_decref_and_unlock。在下面会讨论这个问题。
 		++lev->refcnt;
 		cb = lev->cb;
 		user_data = lev->user_data;
 		UNLOCK(lev);
 		cb(lev, new_fd, (struct sockaddr*)&ss, (int)socklen,
-		    user_data);
+		    user_data); //调用用户设置的回调函数，让用户处理这个fd
 		LOCK(lev);
 		if (lev->refcnt == 1) {
 			int freed = listener_decref_and_unlock(lev);
@@ -441,12 +453,13 @@ listener_read_cb(evutil_socket_t fd, short what, void *p)
 		UNLOCK(lev);
 		return;
 	}
+	//当有错误发生时才会运行到这里
 	if (lev->errorcb != NULL) {
 		++lev->refcnt;
 		errorcb = lev->errorcb;
 		user_data = lev->user_data;
 		UNLOCK(lev);
-		errorcb(lev, user_data);
+		errorcb(lev, user_data); //调用用户设置的错误回调函数
 		LOCK(lev);
 		listener_decref_and_unlock(lev);
 	} else {

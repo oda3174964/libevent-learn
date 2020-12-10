@@ -163,6 +163,7 @@ evthread_posix_cond_wait(void *cond_, void *lock_, const struct timeval *tv)
 int
 evthread_use_pthreads(void)
 {
+	// 结构体中做一些函数指针作为参数。这些函数都是定义在evthread_pthread.c文件中
 	struct evthread_lock_callbacks cbs = {
 		EVTHREAD_LOCK_API_VERSION,
 		EVTHREAD_LOCKTYPE_RECURSIVE,
@@ -184,8 +185,11 @@ evthread_use_pthreads(void)
 	if (pthread_mutexattr_settype(&attr_recursive, PTHREAD_MUTEX_RECURSIVE))
 		return -1;
 
+	// 定制锁操作
 	evthread_set_lock_callbacks(&cbs);
+	// 定制条件变量操作
 	evthread_set_condition_callbacks(&cond_cbs);
+	// 设置可以获取线程ID的回调函数
 	evthread_set_id_callback(evthread_posix_get_id);
 	return 0;
 }

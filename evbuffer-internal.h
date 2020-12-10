@@ -81,6 +81,10 @@ struct evbuffer {
 	/** The first chain in this buffer's linked list of chains. */
 	struct evbuffer_chain *first;
 	/** The last chain in this buffer's linked list of chains. */
+	//这是一个二级指针。使用*last_with_datap时，指向的是链表中最后一个有数据的evbuffer_chain。
+	//所以last_with_datap存储的是倒数第二个evbuffer_chain的next成员地址。
+	//一开始buffer->last_with_datap = &buffer->first;此时first为NULL。所以当链表没有节点时
+	//*last_with_datap为NULL。当只有一个节点时*last_with_datap就是first
 	struct evbuffer_chain *last;
 
 	/** Pointer to the next pointer pointing at the 'last_with_data' chain.
@@ -99,7 +103,7 @@ struct evbuffer {
 	struct evbuffer_chain **last_with_datap;
 
 	/** Total amount of bytes stored in all chains.*/
-	size_t total_len;
+	size_t total_len; //链表中所有chain的总字节数
 
 	/** Number of bytes we have added to the buffer since we last tried to
 	 * invoke callbacks. */
@@ -173,15 +177,18 @@ struct evbuffer_chain {
 	struct evbuffer_chain *next;
 
 	/** total allocation available in the buffer field. */
-	size_t buffer_len;
+	size_t buffer_len; //buffer的大小
 
 	/** unused space at the beginning of buffer or an offset into a
 	 * file for sendfile buffers. */
+	//错开不使用的空间。该成员的值一般等于0
 	ev_misalign_t misalign;
 
 	/** Offset into buffer + misalign at which to start writing.
 	 * In other words, the total number of bytes actually stored
 	 * in buffer. */
+	//evbuffer_chain已存数据的字节数
+	//所以要从buffer + misalign + off的位置开始写入数
 	size_t off;
 
 	/** Set if special handling is required for this chain */
@@ -276,6 +283,7 @@ struct evbuffer_multicast_parent {
 
 #define EVBUFFER_CHAIN_SIZE sizeof(struct evbuffer_chain)
 /** Return a pointer to extra data allocated along with an evbuffer. */
+//宏的作用就是返回，chain + sizeof(evbuffer_chain) 的内存地址
 #define EVBUFFER_CHAIN_EXTRA(t, c) (t *)((struct evbuffer_chain *)(c) + 1)
 
 /** Assert that we are holding the lock on an evbuffer */

@@ -54,14 +54,14 @@ extern "C" {
 /* For evkeyvalq */
 #include <event2/keyvalq_struct.h>
 
-#define EVLIST_TIMEOUT	    0x01
-#define EVLIST_INSERTED	    0x02
-#define EVLIST_SIGNAL	    0x04
-#define EVLIST_ACTIVE	    0x08
-#define EVLIST_INTERNAL	    0x10
+#define EVLIST_TIMEOUT	    0x01 //event从属于定时器队列或者时间堆
+#define EVLIST_INSERTED	    0x02 //event从属于注册队列
+#define EVLIST_SIGNAL	    0x04 //没有使用
+#define EVLIST_ACTIVE	    0x08 //event从属于活动队列
+#define EVLIST_INTERNAL	    0x10 //该event是内部使用的。信号处理时有用到
 #define EVLIST_ACTIVE_LATER 0x20
 #define EVLIST_FINALIZING   0x40
-#define EVLIST_INIT	    0x80
+#define EVLIST_INIT	    0x80 //event已经被初始化了
 
 #define EVLIST_ALL          0xff
 
@@ -126,31 +126,42 @@ struct event {
 	/* for managing timeouts */
 	union {
 		TAILQ_ENTRY(event) ev_next_with_common_timeout;
-		int min_heap_idx;
-	} ev_timeout_pos;
+		int min_heap_idx; //指明该event结构体在堆的位置
+	} ev_timeout_pos; //仅用于定时事件处理器(event).EV_TIMEOUT类型
+	//对于I/O事件，是文件描述符；对于signal事件，是信号值
 	evutil_socket_t ev_fd;
 
-	struct event_base *ev_base;
+	struct event_base *ev_base; //所属的event_base
 
+	//因为信号和I/O是不能同时设置的。所以可以使用共用体以省内存
+	//在低版本的Libevent，两者是分开的，不在共用体内。
 	union {
+		//无论是信号还是IO，都有一个TAILQ_ENTRY的队列。它用于这样的情景:
+		//用户对同一个fd调用event_new多次，并且都使用了不同的回调函数。
+		//每次调用event_new都会产生一个event*。这个xxx_next成员就是把这些
+		//event连接起来的
+
 		/* used for io events */
+		//用于IO事件
 		struct {
 			LIST_ENTRY (event) ev_io_next;
 			struct timeval ev_timeout;
 		} ev_io;
 
 		/* used by signal events */
+		//用于信号事件
 		struct {
 			LIST_ENTRY (event) ev_signal_next;
-			short ev_ncalls;
+			short ev_ncalls; //事件就绪执行时，调用ev_callback的次数
 			/* Allows deletes in callback */
-			short *ev_pncalls;
+			short *ev_pncalls; //指针，指向次数
 		} ev_signal;
 	} ev_;
 
+	//记录监听的事件类型 EV_READ EVTIMEOUT之类
 	short ev_events;
 	short ev_res;		/* result passed to event callback */
-	struct timeval ev_timeout;
+	struct timeval ev_timeout; //用于定时器,指定定时器的超时值
 };
 
 TAILQ_HEAD (event_list, event);
