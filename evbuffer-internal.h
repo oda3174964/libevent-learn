@@ -59,20 +59,21 @@ extern "C" {
 
 /** A single evbuffer callback for an evbuffer. This function will be invoked
  * when bytes are added to or removed from the evbuffer. */
+//内部结构体，结构体成员对用户透明
 struct evbuffer_cb_entry {
 	/** Structures to implement a doubly-linked queue of callbacks */
 	LIST_ENTRY(evbuffer_cb_entry) next;
 	/** The callback function to invoke when this callback is called.
 	    If EVBUFFER_CB_OBSOLETE is set in flags, the cb_obsolete field is
 	    valid; otherwise, cb_func is valid. */
-	union {
+	union { //哪个回调类型。一般都是evbuffer_cb_func
 		evbuffer_cb_func cb_func;
 		evbuffer_cb cb_obsolete;
 	} cb;
 	/** Argument to pass to cb. */
-	void *cbarg;
+	void *cbarg; //回调函数的参数
 	/** Currently set flags on this callback. */
-	ev_uint32_t flags;
+	ev_uint32_t flags; //该回调的标志
 };
 
 struct bufferevent;

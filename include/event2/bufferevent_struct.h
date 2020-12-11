@@ -72,37 +72,38 @@ struct bufferevent {
 	struct event_base *ev_base;
 	/** Pointer to a table of function pointers to set up how this
 	    bufferevent behaves. */
+	//操作结构体，成员有一些函数指针。类似struct eventop结构体
 	const struct bufferevent_ops *be_ops;
 
 	/** A read event that triggers when a timeout has happened or a socket
 	    is ready to read data.  Only used by some subtypes of
 	    bufferevent. */
-	struct event ev_read;
+	struct event ev_read; //读事件event
 	/** A write event that triggers when a timeout has happened or a socket
 	    is ready to write data.  Only used by some subtypes of
 	    bufferevent. */
-	struct event ev_write;
+	struct event ev_write; //写事件event
 
 	/** An input buffer. Only the bufferevent is allowed to add data to
 	    this buffer, though the user is allowed to drain it. */
-	struct evbuffer *input;
+	struct evbuffer *input; //读缓冲区
 
 	/** An input buffer. Only the bufferevent is allowed to drain data
 	    from this buffer, though the user is allowed to add it. */
-	struct evbuffer *output;
+	struct evbuffer *output; //写缓冲区
 
-	struct event_watermark wm_read;
-	struct event_watermark wm_write;
+	struct event_watermark wm_read; //读水位
+	struct event_watermark wm_write; //写水位
 
-	bufferevent_data_cb readcb;
-	bufferevent_data_cb writecb;
+	bufferevent_data_cb readcb; //可读时的回调函数指针
+	bufferevent_data_cb writecb; //可写时的回调函数指针
 	/* This should be called 'eventcb', but renaming it would break
 	 * backward compatibility */
-	bufferevent_event_cb errorcb;
-	void *cbarg;
+	bufferevent_event_cb errorcb; //错误发生时的回调函数指针
+	void *cbarg; //回调函数的参数
 
-	struct timeval timeout_read;
-	struct timeval timeout_write;
+	struct timeval timeout_read; //读事件event的超时值
+	struct timeval timeout_write; //写事件event的超时值
 
 	/** Events that are currently enabled: currently EV_READ and EV_WRITE
 	    are supported. */

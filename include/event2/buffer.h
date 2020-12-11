@@ -114,13 +114,13 @@ struct evbuffer
     @see evbuffer_ptr_set()
  */
 struct evbuffer_ptr {
-	ev_ssize_t pos;
+	ev_ssize_t pos; //总偏移量，相对于数据的开始位置
 
 	/* Do not alter or rely on the values of fields: they are for internal
 	 * use */
 	struct {
-		void *chain;
-		size_t pos_in_chain;
+		void *chain; //指明是哪个evbuffer_chain
+		size_t pos_in_chain; //在evbuffer_chain中的偏移量
 	} internal_;
 };
 
@@ -772,9 +772,9 @@ struct evbuffer_ptr evbuffer_search_range(struct evbuffer *buffer, const char *w
 enum evbuffer_ptr_how {
 	/** Sets the pointer to the position; can be called on with an
 	    uninitialized evbuffer_ptr. */
-	EVBUFFER_PTR_SET,
+	EVBUFFER_PTR_SET, //偏移量是一个绝对位置
 	/** Advances the pointer by adding to the current position. */
-	EVBUFFER_PTR_ADD
+	EVBUFFER_PTR_ADD //偏移量是一个相对位置
 };
 
 /**
@@ -863,11 +863,14 @@ int evbuffer_peek(struct evbuffer *buffer, ev_ssize_t len,
 struct evbuffer_cb_info {
 	/** The number of bytes in this evbuffer when callbacks were last
 	 * invoked. */
-	size_t orig_size;
+	size_t orig_size; //添加或者删除数据之前的evbuffer有多少字节的数据
 	/** The number of bytes added since callbacks were last invoked. */
-	size_t n_added;
+	size_t n_added; //添加了多少数
 	/** The number of bytes removed since callbacks were last invoked. */
-	size_t n_deleted;
+	size_t n_deleted; //删除了多少数据
+
+  //因为每次删除或者添加数据都会调用回调函数，所以上面的三个成员只能记录从上一次
+	//回调函数被调用后，到本次回调函数被调用这段时间的情况
 };
 
 /** Type definition for a callback that is invoked whenever data is added or

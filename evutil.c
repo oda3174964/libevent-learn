@@ -582,6 +582,9 @@ evutil_socket_finished_connecting_(evutil_socket_t fd)
 	int e;
 	ev_socklen_t elen = sizeof(e);
 
+	//用来检测这个fd是否已经连接上了，这个fd是非阻塞的
+	//如果e的值被设为0，那么就说明连接上了。
+	//否则e被设置为对应的错误值。
 	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (void*)&e, &elen) < 0)
 		return -1;
 

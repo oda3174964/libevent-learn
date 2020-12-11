@@ -156,9 +156,11 @@ struct bufferevent_private {
 	struct bufferevent bev;
 
 	/** Evbuffer callback to enforce watermarks on input. */
+	//设置input evbuffer的高水位时，需要一个evbuffer回调函数配合工作
 	struct evbuffer_cb_entry *read_watermarks_cb;
 
 	/** If set, we should free the lock when we free the bufferevent. */
+	//锁是Libevent自动分配的，还是用户分配的
 	unsigned own_lock : 1;
 
 	/** Flag: set if we have deferred callbacks and a read callback is
@@ -168,9 +170,11 @@ struct bufferevent_private {
 	 * pending. */
 	unsigned writecb_pending : 1;
 	/** Flag: set if we are currently busy connecting. */
+	//这个socket是否处理正在连接服务器状态
 	unsigned connecting : 1;
 	/** Flag: set if a connect failed prematurely; this is a hack for
 	 * getting around the bufferevent abstraction. */
+	//标志连接被拒绝
 	unsigned connection_refused : 1;
 	/** Set to the events pending if we have deferred callbacks and
 	 * an events callback is pending. */
@@ -179,11 +183,13 @@ struct bufferevent_private {
 	/** If set, read is suspended until one or more conditions are over.
 	 * The actual value here is a bitfield of those conditions; see the
 	 * BEV_SUSPEND_* flags above. */
+	//标志是什么原因把 读 挂起来
 	bufferevent_suspend_flags read_suspended;
 
 	/** If set, writing is suspended until one or more conditions are over.
 	 * The actual value here is a bitfield of those conditions; see the
 	 * BEV_SUSPEND_* flags above. */
+	//标志是什么原因把 写 挂起来
 	bufferevent_suspend_flags write_suspended;
 
 	/** Set to the current socket errno if we have deferred callbacks and
@@ -200,6 +206,7 @@ struct bufferevent_private {
 	enum bufferevent_options options;
 
 	/** Current reference count for this bufferevent. */
+	// bufferevent的引用计数
 	int refcnt;
 
 	/** Lock for this bufferevent.  Shared by the inbuf and the outbuf.
@@ -252,7 +259,7 @@ union bufferevent_ctrl_data {
 */
 struct bufferevent_ops {
 	/** The name of the bufferevent's type. */
-	const char *type;
+	const char *type; //类型名称
 	/** At what offset into the implementation type will we find a
 	    bufferevent structure?
 
@@ -263,18 +270,20 @@ struct bufferevent_ops {
 	    }
 	    then mem_offset should be offsetof(struct bufferevent_x, bev)
 	*/
-	off_t mem_offset;
+	off_t mem_offset; //成员bev的偏移量
 
 	/** Enables one or more of EV_READ|EV_WRITE on a bufferevent.  Does
 	    not need to adjust the 'enabled' field.  Returns 0 on success, -1
 	    on failure.
 	 */
+	//启动。将event加入到event_base中
 	int (*enable)(struct bufferevent *, short);
 
 	/** Disables one or more of EV_READ|EV_WRITE on a bufferevent.  Does
 	    not need to adjust the 'enabled' field.  Returns 0 on success, -1
 	    on failure.
 	 */
+	//关闭。将event从event_base中删除
 	int (*disable)(struct bufferevent *, short);
 
 	/** Detatches the bufferevent from related data structures. Called as
@@ -288,12 +297,14 @@ struct bufferevent_ops {
 	void (*destruct)(struct bufferevent *);
 
 	/** Called when the timeouts on the bufferevent have changed.*/
+	//调整event的超时值
 	int (*adj_timeouts)(struct bufferevent *);
 
 	/** Called to flush data. */
 	int (*flush)(struct bufferevent *, short, enum bufferevent_flush_mode);
 
 	/** Called to access miscellaneous fields. */
+	//获取成员的值。具体看实现
 	int (*ctrl)(struct bufferevent *, enum bufferevent_ctrl_op, union bufferevent_ctrl_data *);
 
 };
